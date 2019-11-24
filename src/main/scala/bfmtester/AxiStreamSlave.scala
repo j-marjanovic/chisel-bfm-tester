@@ -46,6 +46,7 @@ class AxiStreamSlave(val iface: AxiStreamIf,
   var backpressure : Double = 0.8
   private var resp = ListBuffer[(BigInt, BigInt)]()
   private var stop_next : Boolean = false
+  private var verbose : Boolean = false
 
   private def printWithBg(s: String): Unit = {
     // dark blue on light gray
@@ -58,10 +59,16 @@ class AxiStreamSlave(val iface: AxiStreamIf,
     ls
   }
 
+  def setVerbose(enable_verbose: Boolean) {
+    verbose = enable_verbose
+  }
+
   def update(t: Long): Unit = {
     val rnd = Math.random()
     val ready_val = if (rnd > backpressure) { 0 } else { 1 }
-    printWithBg(f"${t}%5d Monitor: ready = ${ready_val}")
+    if (verbose) {
+      printWithBg(f"${t}%5d Monitor($ident): ready = ${ready_val}")
+    }
     poke(iface.tready, ready_val)
 
     if (stop_next) {
@@ -75,11 +82,11 @@ class AxiStreamSlave(val iface: AxiStreamIf,
       val l = peek(iface.tlast)
       val last = peek(iface.tlast)
       if (last > 0) {
-        printWithBg(f"${t}%5d Monitor: seen TLAST")
+        printWithBg(f"${t}%5d Monitor($ident): seen TLAST")
         stop_next = true
       }
       resp += Tuple2(d, u)
-      printWithBg(f"${t}%5d Monitor: received tdata=${d}, tuser=${u}")
+      printWithBg(f"${t}%5d Monitor($ident): received tdata=${d}, tuser=${u}")
     }
   }
 }
