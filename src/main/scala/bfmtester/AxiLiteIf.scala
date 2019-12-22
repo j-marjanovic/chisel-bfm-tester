@@ -27,7 +27,7 @@ package bfmtester
 import chisel3._
 import chisel3.util.Irrevocable
 
-/** AXI4-Lite interface, as defined in "AMBA AXI4-Lite Interface Specification" 
+/** AXI4-Lite interface, as defined in "AMBA AXI4-Lite Interface Specification"
  *
  * @group interfaces
  */

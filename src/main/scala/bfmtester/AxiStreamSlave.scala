@@ -24,12 +24,10 @@ SOFTWARE.
 
 package bfmtester
 
-
 import scala.collection.mutable.ListBuffer
 import scala.util.Random
 
 import chisel3._
-
 
 /** Monitor for AXI4-Stream
   *
@@ -63,20 +61,22 @@ class AxiStreamSlave(val iface: AxiStreamIf,
     verbose = enable_verbose
   }
 
-  def update(t: Long): Unit = {
+  def update(t: Long, poke: (Bits, BigInt) => Unit): Unit = {
     val rnd = rnd_gen.nextDouble()
     val ready_val = if (rnd > backpressure) { 0 } else { 1 }
     if (verbose) {
       printWithBg(f"${t}%5d Monitor($ident): ready = ${ready_val}")
     }
+
     poke(iface.tready, ready_val)
+    val ready_rbv = peek(iface.tready)
 
     if (stop_next) {
       stop_next = false
       throw new AxiStreamSlaveLastRecv(s"seen tlast at ${t-1}")
     }
     val vld = peek(iface.tvalid)
-    if (vld != 0 && ready_val != 0) {
+    if (vld != 0 && ready_rbv != 0) {
       val d = peek(iface.tdata)
       val u = peek(iface.tuser)
       val l = peek(iface.tlast)

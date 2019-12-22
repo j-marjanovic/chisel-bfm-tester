@@ -30,7 +30,7 @@ import chisel3._
 
 
 /** Driver for AXI4-Stream
-  * 
+  *
   * Drives everything which gets appended to stimulus on the interface
   *
   */
@@ -60,9 +60,9 @@ class AxiStreamMaster(val iface: AxiStreamIf,
   }
   private var state = State.Idle
 
-  private var ready : Boolean = peek(iface.tready) > 0
+  def update(t: Long, poke: (Bits, BigInt) => Unit): Unit = {
+    val ready: Boolean = peek(iface.tready) > 0
 
-  def update(t: Long): Unit = {
     def driveFromStimList(): Unit = {
       val d = stim.remove(0)
 
@@ -105,7 +105,5 @@ class AxiStreamMaster(val iface: AxiStreamIf,
         }
       }
     }
-
-    ready = peek(iface.tready) > 0
   }
 }

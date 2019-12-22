@@ -36,5 +36,5 @@ trait Bfm {
   val poke: (Bits, BigInt) => Unit
   val println: String => Unit
 
-  def update(t: Long): Unit
+  def update(t: Long, poke: (Bits, BigInt) => Unit): Unit
 }

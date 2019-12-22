@@ -50,7 +50,6 @@ import scala.collection.mutable.ListBuffer
   *   if both read and write commands are in the queue one after another,
   *   both actions will be performed in parallel.
   */
-
 class AxiLiteMaster(val axi: AxiLiteIf,
                     val peek: Bits => BigInt,
                     val poke: (Bits, BigInt) => Unit,
@@ -85,7 +84,7 @@ class AxiLiteMaster(val axi: AxiLiteIf,
       println("\u001b[30;46m" + s + "\u001b[39;49m")
     }
 
-    def update(t: Long): Unit = {
+    def update(t: Long, poke: (Bits, BigInt) => Unit): Unit = {
       state match {
         case State.Idle => {
           if (cmdList.nonEmpty && cmdList(0).is_read) {
@@ -146,7 +145,7 @@ class AxiLiteMaster(val axi: AxiLiteIf,
       println("\u001b[30;45m" + s + "\u001b[39;49m")
     }
 
-    def update(t: Long): Unit = {
+    def update(t: Long, poke: (Bits, BigInt) => Unit): Unit = {
       state match {
         case State.Idle => {
           if (cmdList.nonEmpty && !cmdList(0).is_read) {
@@ -220,8 +219,8 @@ class AxiLiteMaster(val axi: AxiLiteIf,
   }
 
   /** part of ChiselBFM, should be called every clock cycle */
-  def update(t: Long): Unit = {
-    read_if.update(t)
-    write_if.update(t)
+  def update(t: Long, poke: (Bits, BigInt) => Unit): Unit = {
+    read_if.update(t, poke)
+    write_if.update(t, poke)
   }
 }

@@ -47,4 +47,3 @@ class AxiStreamBfmCycle(var tdata : BigInt,
                        )
 
 class AxiStreamSlaveLastRecv(msg: String = "") extends Exception(msg)
-        

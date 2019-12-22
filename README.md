@@ -7,8 +7,11 @@ Examples are available in [bfm-tester-examples](https://github.com/j-marjanovic/
 
 ## Changelog
 
-### Unreleased
+### 0.3 - 2019-12-22
 
+- Change poke behavior: now all pokes are put into a queue and the values
+  are updated at end of each clock cycle - similar to Verilog's Non-Blocking
+  Assignments
 - AXI4-Stream slave BFM: Fix backpressure generation; random value is now
   generated from a testbench-wide random generator
 

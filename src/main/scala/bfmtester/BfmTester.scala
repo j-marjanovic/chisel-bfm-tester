@@ -32,6 +32,8 @@ import chisel3.experimental.MultiIOModule
 import chisel3.iotesters._
 import chisel3.iotesters.PeekPokeTester
 
+import scala.collection.mutable
+
 /** Chisel tester with Bus Functional Models */
 abstract class BfmTester[+T <: MultiIOModule](dut: T) extends PeekPokeTester(dut) {
   private val rm = runtimeMirror(getClass.getClassLoader)
@@ -39,10 +41,20 @@ abstract class BfmTester[+T <: MultiIOModule](dut: T) extends PeekPokeTester(dut
   private val members = im.symbol.typeSignature.members
   private def bfms: Iterable[universe.Symbol] = members.filter(_.typeSignature <:< typeOf[Bfm])
 
+  private val update_queue = new mutable.Queue[(Bits, BigInt)]
+
+  private def poke_onto_queue(signal: Bits, value: BigInt): Unit = {
+    update_queue.enqueue((signal, value))
+  }
+
   private def stepSingle(): Unit = {
     for (bfm <- bfms) {
-      im.reflectField(bfm.asTerm).get.asInstanceOf[Bfm].update(t)
+      im.reflectField(bfm.asTerm).get.asInstanceOf[Bfm].update(t, poke_onto_queue)
     }
+    for (el <- update_queue) {
+      poke(el._1, el._2)
+    }
+    update_queue.clear()
     super.step(1)
   }
 
