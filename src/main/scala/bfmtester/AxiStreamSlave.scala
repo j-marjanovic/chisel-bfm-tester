@@ -64,7 +64,7 @@ class AxiStreamSlave(val iface: AxiStreamIf,
   }
 
   def update(t: Long): Unit = {
-    val rnd = Math.random()
+    val rnd = rnd_gen.nextDouble()
     val ready_val = if (rnd > backpressure) { 0 } else { 1 }
     if (verbose) {
       printWithBg(f"${t}%5d Monitor($ident): ready = ${ready_val}")
