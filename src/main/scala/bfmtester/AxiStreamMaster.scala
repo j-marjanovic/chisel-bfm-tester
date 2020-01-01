@@ -40,6 +40,7 @@ class AxiStreamMaster(val iface: AxiStreamIf,
                       val println: String => Unit,
                       val ident: String = "") extends Bfm {
   private var stim = ListBuffer[AxiStreamBfmCycle]()
+  private var verbose : Boolean = false
 
   def stimAppend(tdata: BigInt, tlast: BigInt, tuser: BigInt = 0): Unit = {
     stim += new AxiStreamBfmCycle(tdata, tlast, tuser)
@@ -47,6 +48,10 @@ class AxiStreamMaster(val iface: AxiStreamIf,
 
   def stimAppend(ls: List[AxiStreamBfmCycle]): Unit = {
     stim ++= ls
+  }
+
+  def setVerbose(enable_verbose: Boolean) {
+    verbose = enable_verbose
   }
 
   private def printWithBg(s: String): Unit = {
@@ -59,30 +64,33 @@ class AxiStreamMaster(val iface: AxiStreamIf,
     val Idle, Drive = Value
   }
   private var state = State.Idle
+  private var ready: Boolean = peek(iface.tready) > 0
+
+  private def driveInterfaceFromStimList(poke: (Bits, BigInt) => Unit): Unit = {
+    val d = stim.remove(0)
+
+    poke(iface.tvalid, 1)
+    poke(iface.tdata, d.tdata)
+    poke(iface.tlast, d.tlast)
+    poke(iface.tuser, d.tuser)
+  }
+
+  private def releaseInterface(poke: (Bits, BigInt) => Unit): Unit = {
+    poke(iface.tvalid, 0)
+    poke(iface.tdata, 0)
+    poke(iface.tlast, 0)
+    poke(iface.tuser, 0)
+  }
 
   def update(t: Long, poke: (Bits, BigInt) => Unit): Unit = {
-    val ready: Boolean = peek(iface.tready) > 0
-
-    def driveFromStimList(): Unit = {
-      val d = stim.remove(0)
-
-      poke(iface.tvalid, 1)
-      poke(iface.tdata, d.tdata)
-      poke(iface.tlast, d.tlast)
-      poke(iface.tuser, d.tuser)
-    }
-
-    def release(): Unit = {
-      poke(iface.tvalid, 0)
-      poke(iface.tdata, 0)
-      poke(iface.tlast, 0)
-      poke(iface.tuser, 0)
+    if (verbose) {
+      printWithBg(f"${t}%5d AxiStreamMaster($ident): ready = ${ready}")
     }
 
     state match {
       case State.Idle => {
         if (stim.nonEmpty) {
-          driveFromStimList()
+          driveInterfaceFromStimList(poke)
           state = State.Drive
         }
       }
@@ -91,13 +99,13 @@ class AxiStreamMaster(val iface: AxiStreamIf,
           val tdata = peek(iface.tdata)
           val tuser = peek(iface.tuser)
           val tlast = peek(iface.tlast)
-          printWithBg(f"${t}%5d Driver($ident): sent tdata=${tdata}, tlast=${tlast}, tuser=${tuser}")
+          printWithBg(f"${t}%5d AxiStreamMaster($ident): sent tdata=${tdata}, tlast=${tlast}, tuser=${tuser}")
 
           if (stim.nonEmpty) {
-            driveFromStimList()
+            driveInterfaceFromStimList(poke)
             state = State.Drive
           } else {
-            release()
+            releaseInterface(poke)
             state = State.Idle
           }
         } else {
@@ -105,5 +113,9 @@ class AxiStreamMaster(val iface: AxiStreamIf,
         }
       }
     }
+
+    ready = peek(iface.tready) > 0
   }
+
+  printWithBg(f"      AxiStreamMaster($ident): BFM initialized")
 }

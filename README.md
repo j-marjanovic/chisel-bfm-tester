@@ -7,6 +7,11 @@ Examples are available in [bfm-tester-examples](https://github.com/j-marjanovic/
 
 ## Changelog
 
+### 0.3.1 - 2019-01-01
+
+- AXI4-Stream master BFM: add verbosity control
+- AXI4-Stream slave BFM: update handling of the backpressure
+
 ### 0.3 - 2019-12-22
 
 - Change poke behavior: now all pokes are put into a queue and the values

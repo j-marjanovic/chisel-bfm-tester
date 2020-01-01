@@ -41,7 +41,7 @@ class AxiStreamSlave(val iface: AxiStreamIf,
                      val ident: String = "",
                      val rnd_gen: Random) extends Bfm {
 
-  var backpressure : Double = 0.8
+  var backpressure : Double = 0.2
   private var resp = ListBuffer[(BigInt, BigInt)]()
   private var stop_next : Boolean = false
   private var verbose : Boolean = false
@@ -63,30 +63,30 @@ class AxiStreamSlave(val iface: AxiStreamIf,
 
   def update(t: Long, poke: (Bits, BigInt) => Unit): Unit = {
     val rnd = rnd_gen.nextDouble()
-    val ready_val = if (rnd > backpressure) { 0 } else { 1 }
+    val ready_val = if (rnd > backpressure) { 1 } else { 0 }
     if (verbose) {
-      printWithBg(f"${t}%5d Monitor($ident): ready = ${ready_val}")
+      printWithBg(f"${t}%5d AxiStreamSlave($ident): ready = ${ready_val}")
     }
 
     poke(iface.tready, ready_val)
-    val ready_rbv = peek(iface.tready)
 
     if (stop_next) {
       stop_next = false
       throw new AxiStreamSlaveLastRecv(s"seen tlast at ${t-1}")
     }
     val vld = peek(iface.tvalid)
-    if (vld != 0 && ready_rbv != 0) {
+    if (vld != 0 && ready_val != 0) {
       val d = peek(iface.tdata)
       val u = peek(iface.tuser)
       val l = peek(iface.tlast)
-      val last = peek(iface.tlast)
-      if (last > 0) {
-        printWithBg(f"${t}%5d Monitor($ident): seen TLAST")
+      if (l > 0) {
+        printWithBg(f"${t}%5d AxiStreamSlave($ident): seen TLAST")
         stop_next = true
       }
       resp += Tuple2(d, u)
-      printWithBg(f"${t}%5d Monitor($ident): received tdata=${d}, tuser=${u}")
+      printWithBg(f"${t}%5d AxiStreamSlave($ident): received tdata=${d}, tuser=${u}")
     }
   }
+
+  printWithBg(f"      AxiStreamSlave($ident): BFM initialized")
 }
