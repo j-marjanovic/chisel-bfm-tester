@@ -24,22 +24,22 @@ SOFTWARE.
 
 package bfmtester
 
-import scala.reflect.runtime.universe
-import scala.reflect.runtime.universe._
-
 import chisel3._
 import chisel3.experimental.MultiIOModule
-import chisel3.iotesters._
 import chisel3.iotesters.PeekPokeTester
 
 import scala.collection.mutable
+import scala.collection.mutable.ListBuffer
 
 /** Chisel tester with Bus Functional Models */
 abstract class BfmTester[+T <: MultiIOModule](dut: T) extends PeekPokeTester(dut) {
-  private val rm = runtimeMirror(getClass.getClassLoader)
-  private val im = rm.reflect(this)
-  private val members = im.symbol.typeSignature.members
-  private def bfms: Iterable[universe.Symbol] = members.filter(_.typeSignature <:< typeOf[Bfm])
+  private val bfms: ListBuffer[Bfm] = new ListBuffer[Bfm]()
+
+  /** add Bfm to the list of Bfms to be executed each clock cycle */
+  def Bfm[BfmT <: Bfm](bfm: BfmT): BfmT = {
+    bfms += bfm
+    bfm
+  }
 
   private val update_queue = new mutable.Queue[(Bits, BigInt)]
 
@@ -48,8 +48,8 @@ abstract class BfmTester[+T <: MultiIOModule](dut: T) extends PeekPokeTester(dut
   }
 
   private def stepSingle(): Unit = {
-    for (bfm <- bfms) {
-      im.reflectField(bfm.asTerm).get.asInstanceOf[Bfm].update(t, poke_onto_queue)
+    for (bfm <- bfms.toList) {
+      bfm.update(t, poke_onto_queue)
     }
     for (el <- update_queue) {
       poke(el._1, el._2)
@@ -66,15 +66,15 @@ abstract class BfmTester[+T <: MultiIOModule](dut: T) extends PeekPokeTester(dut
 
   object BfmFactory {
     def create_axis_master(iface: AxiStreamIf, ident: String = ""): AxiStreamMaster = {
-      new AxiStreamMaster(iface, peek, poke, println, ident)
+      Bfm(new AxiStreamMaster(iface, peek, poke, println, ident))
     }
 
     def create_axis_slave(iface: AxiStreamIf, ident: String = ""): AxiStreamSlave = {
-      new AxiStreamSlave(iface, peek, poke, println, ident, rnd)
+      Bfm(new AxiStreamSlave(iface, peek, poke, println, ident, rnd))
     }
 
     def create_axilite_master(iface: AxiLiteIf, ident: String = ""): AxiLiteMaster = {
-      new AxiLiteMaster(iface, peek, poke, println)
+      Bfm(new AxiLiteMaster(iface, peek, poke, println))
     }
   }
 }
