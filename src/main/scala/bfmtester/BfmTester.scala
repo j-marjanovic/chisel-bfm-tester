@@ -25,14 +25,14 @@ SOFTWARE.
 package bfmtester
 
 import chisel3._
-import chisel3.experimental.MultiIOModule
-import chisel3.iotesters.PeekPokeTester
+import chiseltest._
 
 import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
 
 /** Chisel tester with Bus Functional Models */
-abstract class BfmTester[+T <: MultiIOModule](dut: T) extends PeekPokeTester(dut) {
+trait BfmTester {
+  this: ChiselScalatestTester =>
   private val bfms: ListBuffer[Bfm] = new ListBuffer[Bfm]()
 
   /** add Bfm to the list of Bfms to be executed each clock cycle */
@@ -52,29 +52,41 @@ abstract class BfmTester[+T <: MultiIOModule](dut: T) extends PeekPokeTester(dut
       bfm.update(t, poke_onto_queue)
     }
     for (el <- update_queue) {
-      poke(el._1, el._2)
+      el._1 match {
+        case b: Bool => el._1.poke(el._2.B)
+        case u: UInt => el._1.poke(el._2.U)
+        case _       => throw new UnsupportedOperationException("")
+      }
     }
     update_queue.clear()
-    super.step(1)
   }
 
-  override def step(n: Int): Unit = {
-    for(_ <- 0 until n) {
-      stepSingle()
+  /** keeps track of the clock cycles elapsed */
+  private var t: Int = 0
+
+  implicit class testableClock(x: Clock) {
+    def step(cycles: Int = 1): Unit = {
+      for(_ <- 0 until cycles) {
+        stepSingle()
+        chiseltest.testableClock(x).step(cycles)
+        t += 1
+      }
     }
   }
+
+  /** provide deterministic random number generator */
+  private val rnd = scala.util.Random
+  def rndSetSeed: Long => Unit = rnd.setSeed
 
   object BfmFactory {
     def create_axis_master(iface: AxiStreamIf, ident: String = ""): AxiStreamMaster = {
-      Bfm(new AxiStreamMaster(iface, peek, poke, println, ident))
+      Bfm(new AxiStreamMaster(iface, ident))
     }
-
     def create_axis_slave(iface: AxiStreamIf, ident: String = ""): AxiStreamSlave = {
-      Bfm(new AxiStreamSlave(iface, peek, poke, println, ident, rnd))
+      Bfm(new AxiStreamSlave(iface, ident, rnd))
     }
-
     def create_axilite_master(iface: AxiLiteIf, ident: String = ""): AxiLiteMaster = {
-      Bfm(new AxiLiteMaster(iface, peek, poke, println))
+      Bfm(new AxiLiteMaster(iface))
     }
   }
 }

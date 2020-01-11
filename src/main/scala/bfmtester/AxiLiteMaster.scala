@@ -25,6 +25,7 @@ SOFTWARE.
 package bfmtester
 
 import chisel3.Bits
+import chiseltest._
 import scala.collection.mutable.ListBuffer
 
 /**
@@ -50,10 +51,7 @@ import scala.collection.mutable.ListBuffer
   *   if both read and write commands are in the queue one after another,
   *   both actions will be performed in parallel.
   */
-class AxiLiteMaster(val axi: AxiLiteIf,
-                    val peek: Bits => BigInt,
-                    val poke: (Bits, BigInt) => Unit,
-                    val println: String => Unit)
+class AxiLiteMaster(val axi: AxiLiteIf)
     extends Bfm {
 
   //==========================================================================
@@ -73,10 +71,10 @@ class AxiLiteMaster(val axi: AxiLiteIf,
     private var r_valid: BigInt = 0
 
     private def peekInputs(): Unit = {
-      ar_ready = peek(axi.AR.ready)
-      r_data = peek(axi.R.bits.rdata)
-      r_resp = peek(axi.R.bits.rresp)
-      r_valid = peek(axi.R.valid)
+      ar_ready = axi.AR.ready.peek().litValue()
+      r_data = axi.R.bits.rdata.peek().litValue()
+      r_resp = axi.R.bits.rresp.peek().litValue()
+      r_valid = axi.R.valid.peek().litValue()
     }
 
     private def printWithBg(s: String): Unit = {
@@ -134,10 +132,10 @@ class AxiLiteMaster(val axi: AxiLiteIf,
     private var b_valid: BigInt = 0
 
     private def peekInputs(): Unit = {
-      aw_ready = peek(axi.AW.ready)
-      w_ready = peek(axi.W.ready)
-      b_resp = peek(axi.B.bits)
-      b_valid = peek(axi.B.valid)
+      aw_ready = axi.AW.ready.peek().litValue()
+      w_ready = axi.W.ready.peek().litValue()
+      b_resp = axi.B.bits.peek().litValue()
+      b_valid = axi.B.valid.peek().litValue()
     }
 
     private def printWithBg(s: String): Unit = {

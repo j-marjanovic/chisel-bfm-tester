@@ -28,6 +28,7 @@ import scala.collection.mutable.ListBuffer
 import scala.util.Random
 
 import chisel3._
+import chiseltest._
 
 /** Monitor for AXI4-Stream
   *
@@ -35,9 +36,6 @@ import chisel3._
   *
   */
 class AxiStreamSlave(val iface: AxiStreamIf,
-                     val peek: Bits => BigInt,
-                     val poke: (Bits, BigInt) => Unit,
-                     val println: String => Unit,
                      val ident: String = "",
                      val rnd_gen: Random) extends Bfm {
 
@@ -74,16 +72,16 @@ class AxiStreamSlave(val iface: AxiStreamIf,
       stop_next = false
       throw new AxiStreamSlaveLastRecv(s"seen tlast at ${t-1}")
     }
-    val vld = peek(iface.tvalid)
+    val vld = iface.tvalid.peek()
     if (vld != 0 && ready_val != 0) {
-      val d = peek(iface.tdata)
-      val u = peek(iface.tuser)
-      val l = peek(iface.tlast)
-      if (l > 0) {
+      val d = iface.tdata.peek()
+      val u = iface.tuser.peek()
+      val l = iface.tlast.peek()
+      if (l.litValue() > 0) {
         printWithBg(f"${t}%5d AxiStreamSlave($ident): seen TLAST")
         stop_next = true
       }
-      resp += Tuple2(d, u)
+      resp += Tuple2(d.litValue(), u.litValue())
       printWithBg(f"${t}%5d AxiStreamSlave($ident): received tdata=${d}, tuser=${u}")
     }
   }

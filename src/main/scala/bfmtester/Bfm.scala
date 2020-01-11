@@ -32,9 +32,5 @@ import chisel3.Bits
   * update() gets called every simulation step (every clock cycle).
   */
 trait Bfm {
-  val peek: Bits => BigInt
-  val poke: (Bits, BigInt) => Unit
-  val println: String => Unit
-
   def update(t: Long, poke: (Bits, BigInt) => Unit): Unit
 }

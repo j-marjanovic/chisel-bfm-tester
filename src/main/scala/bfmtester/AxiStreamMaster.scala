@@ -27,7 +27,7 @@ package bfmtester
 
 import scala.collection.mutable.ListBuffer
 import chisel3._
-
+import chiseltest._
 
 /** Driver for AXI4-Stream
   *
@@ -35,9 +35,6 @@ import chisel3._
   *
   */
 class AxiStreamMaster(val iface: AxiStreamIf,
-                      val peek: Bits => BigInt,
-                      val poke: (Bits, BigInt) => Unit,
-                      val println: String => Unit,
                       val ident: String = "") extends Bfm {
   private var stim = ListBuffer[AxiStreamBfmCycle]()
   private var verbose : Boolean = false
@@ -64,7 +61,7 @@ class AxiStreamMaster(val iface: AxiStreamIf,
     val Idle, Drive = Value
   }
   private var state = State.Idle
-  private var ready: Boolean = peek(iface.tready) > 0
+  private var ready: Boolean = iface.tready.peek().litToBoolean
 
   private def driveInterfaceFromStimList(poke: (Bits, BigInt) => Unit): Unit = {
     val d = stim.remove(0)
@@ -96,9 +93,9 @@ class AxiStreamMaster(val iface: AxiStreamIf,
       }
       case State.Drive => {
         if (ready) {
-          val tdata = peek(iface.tdata)
-          val tuser = peek(iface.tuser)
-          val tlast = peek(iface.tlast)
+          val tdata = iface.tdata.peek()
+          val tuser = iface.tuser.peek()
+          val tlast = iface.tlast.peek()
           printWithBg(f"${t}%5d AxiStreamMaster($ident): sent tdata=${tdata}, tlast=${tlast}, tuser=${tuser}")
 
           if (stim.nonEmpty) {
@@ -114,7 +111,7 @@ class AxiStreamMaster(val iface: AxiStreamIf,
       }
     }
 
-    ready = peek(iface.tready) > 0
+    ready = iface.tready.peek().litToBoolean
   }
 
   printWithBg(f"      AxiStreamMaster($ident): BFM initialized")
