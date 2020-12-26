@@ -98,9 +98,10 @@ class AxiMemSlave(val axi: AxiIf,
     def update_read(t: Long, poke: (Bits, BigInt) => Unit): Unit = {
       // AR
       val arready: Boolean = rnd.nextBoolean()
+      val arready_prev: Boolean = peek(axi.AR.ready) > 0
       val arvalid: Boolean = peek(axi.AR.valid) > 0
       poke(axi.AR.ready, if (arready) 1 else 0)
-      if (arready & arvalid) {
+      if (arready_prev & arvalid) {
         val addr = peek(axi.AR.bits.addr)
         val len = peek(axi.AR.bits.len)
         val id = peek(axi.AR.bits.id)
@@ -122,10 +123,10 @@ class AxiMemSlave(val axi: AxiIf,
         printWithBg(
           f"${t}%5d AxiMemSlave($ident): Read Data (addr=0x${addr.addr}%x, data=0x${data}%032x, rem len=${addr.len})"
         )
-        poke(axi.R.bits.data, addr.addr)
+        poke(axi.R.bits.data, data)
         poke(axi.R.valid, 1)
         poke(axi.R.bits.resp, 0)
-        poke(axi.R.bits.last, if (addr.len == 1) 1 else 0)
+        poke(axi.R.bits.last, if (addr.len == 0) 1 else 0)
         poke(axi.R.bits.id, addr.id)
         if (addr.len == 0) {
           act_read_addr = None
@@ -182,9 +183,10 @@ class AxiMemSlave(val axi: AxiIf,
         if (act_write_addr.nonEmpty) {
           val addr: Addr = act_write_addr.get
           val data = peek(axi.W.bits.data)
+          val last = peek(axi.W.bits.last)
 
           printWithBg(
-            f"${t}%5d AxiMemSlave($ident): Write Data (addr=0x${addr.addr}%x, data=0x${data}%032x, rem len=${addr.len})"
+            f"${t}%5d AxiMemSlave($ident): Write Data (addr=0x${addr.addr}%x, data=0x${data}%032x, len=${addr.len}, last=${last})"
           )
 
           mem_set_word(addr.addr, data, width_bits / 8)
