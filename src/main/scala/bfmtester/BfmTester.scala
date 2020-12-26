@@ -1,7 +1,7 @@
 /*
 MIT License
 
-Copyright (c) 2018-2019 Jan Marjanovic
+Copyright (c) 2018-2020 Jan Marjanovic
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -75,6 +75,10 @@ abstract class BfmTester[+T <: MultiIOModule](dut: T) extends PeekPokeTester(dut
 
     def create_axilite_master(iface: AxiLiteIf, ident: String = ""): AxiLiteMaster = {
       new AxiLiteMaster(iface, peek, poke, println)
+    }
+
+    def create_axi_slave(iface: AxiIf, ident: String = ""): AxiMemSlave = {
+      new AxiMemSlave(iface, rnd, peek, poke, println, ident)
     }
   }
 }

@@ -7,6 +7,10 @@ Examples are available in [bfm-tester-examples](https://github.com/j-marjanovic/
 
 ## Changelog
 
+### [unreleased]
+
+- Add AXI4 memory slave BFM
+
 ### 0.3.1 - 2019-01-01
 
 - AXI4-Stream master BFM: add verbosity control
@@ -28,3 +32,9 @@ Examples are available in [bfm-tester-examples](https://github.com/j-marjanovic/
 ### 0.1 - 2019-11-24
 
 - Initial commit
+
+---
+
+Arm and AMBA are registered trademarks of Arm Limited (or its subsidiaries) in
+the US and/or elsewhere. All trademarks are the property of their respective
+owners.
