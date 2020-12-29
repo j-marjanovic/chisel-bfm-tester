@@ -115,6 +115,8 @@ class AxiLiteMaster(val axi: AxiLiteIf,
 
       peekInputs
     }
+
+    printWithBg(f"      AxiLiteMaster: BFM initialized - read interface")
   }
 
   //==========================================================================
@@ -183,6 +185,8 @@ class AxiLiteMaster(val axi: AxiLiteIf,
 
       peekInputs
     }
+
+    printWithBg(f"      AxiLiteMaster: BFM initialized - write interface")
   }
 
   //==========================================================================

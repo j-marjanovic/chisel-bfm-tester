@@ -10,6 +10,8 @@ Examples are available in [bfm-tester-examples](https://github.com/j-marjanovic/
 ### [unreleased]
 
 - Add AXI4 memory slave BFM
+- Add Pulse Detector
+- Upgrade to Chisel 3.4 and iotesters 1.5
 
 ### 0.3.1 - 2019-01-01
 

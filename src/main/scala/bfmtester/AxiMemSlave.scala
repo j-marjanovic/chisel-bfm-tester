@@ -55,7 +55,7 @@ class AxiMemSlave(val axi: AxiIf,
 
   private def printWithBg(s: String): Unit = {
     // black on magenta
-    println("\u001b[30;45m" + s + "\u001b[39;49m")
+    println("\u001b[97;44m" + s + "\u001b[39;49m")
   }
 
   def mem_set(start_addr: BigInt, els: Seq[Byte]): Unit = {

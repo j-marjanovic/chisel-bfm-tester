@@ -81,5 +81,9 @@ abstract class BfmTester[+T <: MultiIOModule](dut: T) extends PeekPokeTester(dut
       new AxiMemSlave(iface, rnd, bfm_peek, bfm_poke, println, ident)
     }
 
+    def create_pulse_detector(iface: Bool, ident: String = ""): PulseDetector = {
+      new PulseDetector(iface, bfm_peek, bfm_poke, println, ident)
+    }
+
   }
 }
