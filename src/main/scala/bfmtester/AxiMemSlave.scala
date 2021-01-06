@@ -37,13 +37,14 @@ import scala.util.Random
   * from the testbench.
   *
   */
-class AxiMemSlave(val axi: AxiIf,
-                  val rnd: Random,
-                  val peek: Bits => BigInt,
-                  val poke: (Bits, BigInt) => Unit,
-                  val println: String => Unit,
-                  val ident: String = "")
-    extends Bfm {
+class AxiMemSlave(
+    val axi: AxiIf,
+    val rnd: Random,
+    val peek: Bits => BigInt,
+    val poke: (Bits, BigInt) => Unit,
+    val println: String => Unit,
+    val ident: String = ""
+) extends Bfm {
 
   private var verbose: Boolean = true
   private val sparse_mem: mutable.HashMap[BigInt, Byte] = new mutable.HashMap()
@@ -80,7 +81,7 @@ class AxiMemSlave(val axi: AxiIf,
 
   def mem_set_word(start_addr: BigInt, data: BigInt, word_size: Int): Unit = {
     for (i <- 0 until word_size) {
-      val b = (data >> (8 * i)) & 0xFF
+      val b = (data >> (8 * i)) & 0xff
       mem_set(start_addr + i, List[Byte](b.toByte))
     }
   }
@@ -94,6 +95,7 @@ class AxiMemSlave(val axi: AxiIf,
   private class ReadCh {
     private val read_addrs: ListBuffer[Addr] = ListBuffer[Addr]()
     private var act_read_addr: Option[Addr] = None
+    private var in_drive: Boolean = false
 
     def update_read(t: Long, poke: (Bits, BigInt) => Unit): Unit = {
       // AR
@@ -116,26 +118,30 @@ class AxiMemSlave(val axi: AxiIf,
         act_read_addr = Option(read_addrs.remove(0))
       }
 
-      // TODO: handle RREADY
+      val ready = peek(axi.R.ready) > 0
       if (act_read_addr.nonEmpty) {
-        val addr: Addr = act_read_addr.get
-        val data: BigInt = mem_get_word(addr.addr, width_bits / 8)
-        printWithBg(
-          f"${t}%5d AxiMemSlave($ident): Read Data (addr=0x${addr.addr}%x, data=0x${data}%032x, rem len=${addr.len})"
-        )
-        poke(axi.R.bits.data, data)
-        poke(axi.R.valid, 1)
-        poke(axi.R.bits.resp, 0)
-        poke(axi.R.bits.last, if (addr.len == 0) 1 else 0)
-        poke(axi.R.bits.id, addr.id)
-        if (addr.len == 0) {
-          act_read_addr = None
-        } else {
-          val new_addr =
-            new Addr(addr.addr + width_bits / 8, addr.len - 1, addr.id)
-          act_read_addr = Option(new_addr)
+        if ((!in_drive) || (in_drive && ready)) {
+          in_drive = true
+          val addr: Addr = act_read_addr.get
+          val data: BigInt = mem_get_word(addr.addr, width_bits / 8)
+          printWithBg(
+            f"${t}%5d AxiMemSlave($ident): Read Data (addr=0x${addr.addr}%x, data=0x${data}%032x, rem len=${addr.len})"
+          )
+          poke(axi.R.bits.data, data)
+          poke(axi.R.valid, 1)
+          poke(axi.R.bits.resp, 0)
+          poke(axi.R.bits.last, if (addr.len == 0) 1 else 0)
+          poke(axi.R.bits.id, addr.id)
+          if (addr.len == 0) {
+            act_read_addr = None
+          } else {
+            val new_addr =
+              new Addr(addr.addr + width_bits / 8, addr.len - 1, addr.id)
+            act_read_addr = Option(new_addr)
+          }
         }
-      } else {
+      } else if ((!in_drive) || (in_drive && ready)) {
+        in_drive = false
         poke(axi.R.bits.data, 0)
         poke(axi.R.valid, 0)
         poke(axi.R.bits.resp, 0)
