@@ -59,7 +59,7 @@ class AxiLiteMaster(val axi: AxiLiteIf,
   //==========================================================================
   // read interface
   class ReadIf {
-    private var currCmd: Cmd = new Cmd(false, 0, 0, 0)
+    private var currCmd: Cmd = new Cmd(false, 0, 0, 0, 0)
 
     private object State extends Enumeration {
       type State = Value
@@ -95,14 +95,16 @@ class AxiLiteMaster(val axi: AxiLiteIf,
         }
         case State.ReadAddr => {
           poke(axi.AR.valid, 1)
-          poke(axi.AR.bits, currCmd.addr)
+          poke(axi.AR.bits.addr, currCmd.addr)
+          poke(axi.AR.bits.prot, currCmd.prot)
           if (ar_ready != 0) {
             state = State.ReadData
           }
         }
         case State.ReadData => {
           poke(axi.AR.valid, 0)
-          poke(axi.AR.bits, 0)
+          poke(axi.AR.bits.addr, 0)
+          poke(axi.AR.bits.prot, 0)
           poke(axi.R.ready, 1)
           if (r_valid != 0) {
             printWithBg(f"${t}%5d AxiLiteMasterBfm: read: from addr 0x${currCmd.addr}%x data 0x${r_data}%08x")
@@ -122,7 +124,7 @@ class AxiLiteMaster(val axi: AxiLiteIf,
   //==========================================================================
   // write interface
   class WriteIf {
-    private var currCmd: Cmd = new Cmd(false, 0, 0, 0)
+    private var currCmd: Cmd = new Cmd(false, 0, 0, 0, 0)
 
     private object State extends Enumeration {
       type State = Value
@@ -158,7 +160,8 @@ class AxiLiteMaster(val axi: AxiLiteIf,
         }
         case State.WriteAddrData => {
           poke(axi.AW.valid, 1)
-          poke(axi.AW.bits, currCmd.addr)
+          poke(axi.AW.bits.addr, currCmd.addr)
+          poke(axi.AW.bits.prot, currCmd.prot)
           poke(axi.W.valid, 1)
           poke(axi.W.bits.wdata, currCmd.wr_data)
           poke(axi.W.bits.wstrb, currCmd.wr_strb)
@@ -168,7 +171,8 @@ class AxiLiteMaster(val axi: AxiLiteIf,
         }
         case State.WriteWaitResp => {
           poke(axi.AW.valid, 0)
-          poke(axi.AW.bits, 0)
+          poke(axi.AW.bits.addr, 0)
+          poke(axi.AW.bits.prot, 0)
           poke(axi.W.valid, 0)
           poke(axi.W.bits.wdata, 0)
           poke(axi.W.bits.wstrb, 0)
@@ -191,7 +195,7 @@ class AxiLiteMaster(val axi: AxiLiteIf,
 
   //==========================================================================
   // queues
-  class Cmd(val is_read: Boolean, val addr: BigInt, val wr_data: BigInt, val wr_strb: BigInt)
+  class Cmd(val is_read: Boolean, val addr: BigInt, val wr_data: BigInt, val wr_strb: BigInt, val prot: BigInt)
   class Resp(val success: Boolean, val rd_data: BigInt)
   private var cmdList: ListBuffer[Cmd] = new ListBuffer()
   private var respList: ListBuffer[Resp] = new ListBuffer()
@@ -213,13 +217,13 @@ class AxiLiteMaster(val axi: AxiLiteIf,
   }
 
   /** push new read command into the command queue */
-  def readPush(addr: BigInt): Unit = {
-    cmdList += new Cmd(true, addr, 0, 0)
+  def readPush(addr: BigInt, prot: BigInt = 0): Unit = {
+    cmdList += new Cmd(true, addr, 0, 0, prot)
   }
 
   /** push new write command into the command queue */
-  def writePush(addr: BigInt, data: BigInt, strb: BigInt = 0xF): Unit = {
-    cmdList += new Cmd(false, addr, data, strb)
+  def writePush(addr: BigInt, data: BigInt, strb: BigInt = 0xF, prot: BigInt = 0): Unit = {
+    cmdList += new Cmd(false, addr, data, strb, prot)
   }
 
   /** part of ChiselBFM, should be called every clock cycle */

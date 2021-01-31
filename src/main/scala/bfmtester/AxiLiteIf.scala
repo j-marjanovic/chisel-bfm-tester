@@ -33,13 +33,19 @@ import chisel3.util.Irrevocable
  */
 class AxiLiteIf(val addr_w: chisel3.internal.firrtl.Width,
                 val data_w: chisel3.internal.firrtl.Width = 32.W) extends Bundle {
-  val AW = Flipped(Irrevocable(UInt(addr_w)))
+  val AW = Flipped(Irrevocable(new Bundle {
+    val addr: UInt = UInt(addr_w)
+    val prot: UInt = UInt(3.W)
+  }))
   val W = Flipped(Irrevocable(new Bundle {
     val wdata = UInt(data_w)
     val wstrb = UInt((data_w.get/8).W)
   }))
   val B = Irrevocable(UInt(2.W))
-  val AR = Flipped(Irrevocable(UInt(addr_w)))
+  val AR = Flipped(Irrevocable(new Bundle {
+    val addr: UInt = UInt(addr_w)
+    val prot: UInt = UInt(3.W)
+  }))
   val R = Irrevocable(new Bundle {
     val rdata = UInt(data_w); val rresp = UInt(2.W)
   })
