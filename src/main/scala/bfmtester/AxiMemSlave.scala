@@ -1,7 +1,7 @@
 /*
 MIT License
 
-Copyright (c) 2018-2020 Jan Marjanovic
+Copyright (c) 2018-2021 Jan Marjanovic
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -153,6 +153,7 @@ class AxiMemSlave(
 
   private class WriteCh {
     private val write_addrs: ListBuffer[Addr] = ListBuffer[Addr]()
+    private val tmp_data_queue: ListBuffer[BigInt] = ListBuffer() // data before addr
     private var act_write_addr: Option[Addr] = None
     private var gen_resp: Boolean = false
 
@@ -163,13 +164,32 @@ class AxiMemSlave(
       val awvalid: Boolean = peek(axi.AW.valid) > 0
       poke(axi.AW.ready, if (awready) 1 else 0)
       if (awready_prev & awvalid) {
-        val addr = peek(axi.AW.bits.addr)
-        val len = peek(axi.AW.bits.len)
+        var addr = peek(axi.AW.bits.addr)
+        var len = peek(axi.AW.bits.len)
         val id = peek(axi.AW.bits.id)
-        write_addrs += new Addr(addr, len, id)
+
         printWithBg(
           f"${t}%5d AxiMemSlave($ident): Write Address (addr=0x${addr}%x, len=${len}, id=0x${id}%x)"
         )
+
+        // if there was data received before we had an address, the data was stored in tmp queue
+        // before we pass the address to the write_data process, handle all the pending data transactions
+        val data_count = Math.min(tmp_data_queue.length, len.toInt)
+        for (data <- tmp_data_queue.take(data_count)) {
+          mem_set_word(addr, data, width_bits / 8)
+          printWithBg(
+            f"${t}%5d AxiMemSlave($ident): Write Data (addr=0x${addr}%x, data=0x${data}%032x, len=${len}) - from tmp queue"
+          )
+          addr += width_bits / 8
+          len -= 1
+        }
+        tmp_data_queue.remove(0, data_count)
+
+        if (len != 0) {
+          write_addrs += new Addr(addr, len, id)
+        } else {
+          gen_resp = true
+        }
       }
     }
 
@@ -206,8 +226,8 @@ class AxiMemSlave(
             act_write_addr = Option(new_addr)
           }
         } else {
-          //val addr: Addr = act_write_addr.get
           val data = peek(axi.W.bits.data)
+          tmp_data_queue += data
 
           printWithBg(
             f"${t}%5d AxiMemSlave($ident): Write Data (addr=<not recv>, data=0x${data}%032x, rem len=<not recv>)"
@@ -236,8 +256,8 @@ class AxiMemSlave(
 
   override def update(t: Long, poke: (Bits, BigInt) => Unit): Unit = {
     rd_ch.update_read(t, poke)
-    wr_ch.update_write_addr(t, poke)
     wr_ch.update_write_data(t, poke)
+    wr_ch.update_write_addr(t, poke)
     wr_ch.update_write_resp(t, poke)
   }
 
