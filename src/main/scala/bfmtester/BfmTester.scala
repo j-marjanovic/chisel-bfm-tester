@@ -65,6 +65,10 @@ abstract class BfmTester[+T <: MultiIOModule](dut: T) extends PeekPokeTester(dut
   def bfm_poke(bs: Bits, x: BigInt): Unit = this.poke(bs, x)
 
   object BfmFactory {
+    def create_avalon_slave(iface: AvalonMMIf, ident: String = ""): AvalonMMMemSlave = {
+      new AvalonMMMemSlave(iface, rnd, bfm_peek, bfm_poke, println, ident)
+    }
+
     def create_axis_master(iface: AxiStreamIf, ident: String = ""): AxiStreamMaster = {
       new AxiStreamMaster(iface, bfm_peek, bfm_poke, println, ident)
     }

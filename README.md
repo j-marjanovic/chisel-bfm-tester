@@ -10,6 +10,7 @@ Examples are available in [bfm-tester-examples](https://github.com/j-marjanovic/
 ### [unreleased]
 
 - Add AXI4 memory slave BFM
+- Add Avalon® Memory-Mapped memory slave BFM
 - Add Pulse Detector
 - Add AxPROT to AXI4-Lite interface
 - Upgrade to Chisel 3.4 and iotesters 1.5
@@ -39,5 +40,5 @@ Examples are available in [bfm-tester-examples](https://github.com/j-marjanovic/
 ---
 
 Arm and AMBA are registered trademarks of Arm Limited (or its subsidiaries) in
-the US and/or elsewhere. All trademarks are the property of their respective
-owners.
+the US and/or elsewhere. Avalon is a registered trademark of Intel Corporation
+or its subsidiaries. All trademarks are the property of their respective owners.
