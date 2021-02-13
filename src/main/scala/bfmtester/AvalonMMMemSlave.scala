@@ -89,6 +89,7 @@ class AvalonMMMemSlave(
   def update_wr(waitrequest: Boolean, t: Long, poke: (Bits, BigInt) => Unit): Unit = {
     //val waitrequest = peek(avalon.waitrequest) > 0
     val write = peek(avalon.write) > 0
+    poke(avalon.writeresponsevalid, 0)
     if (!waitrequest && write) {
       if (addr.isEmpty) {
         addr = Some(peek(avalon.address))
@@ -108,6 +109,7 @@ class AvalonMMMemSlave(
 
       if (burst_rem == 0) {
         addr = None
+        poke(avalon.writeresponsevalid, 1)
       } else {
         addr = addr.map(_ + BigInt(width_bits / 8))
         burst_rem -= 1
