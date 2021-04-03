@@ -52,7 +52,6 @@ class AxiLiteSubordinateGenerator(
   // regs
 
   val regs: RegType = generate_regs(area_map)
-  println(regs)
 
   generate_reg_update(area_map, regs, io.inp)
   generate_reg_output(area_map, regs, io.out)
@@ -169,7 +168,7 @@ class AxiLiteSubordinateGenerator(
   //==========================================================================
   // read part
 
-  val sRdIdle :: sRdRead :: sRdResp :: Nil = Enum(3)
+  val sRdIdle :: sMemCyc :: sRdRead :: sRdResp :: Nil = Enum(4)
   val state_rd = RegInit(sRdIdle)
 
   val rd_en = Reg(Bool())
@@ -184,8 +183,15 @@ class AxiLiteSubordinateGenerator(
       when(io.ctrl.AR.valid) {
         rd_en := true.B
         rd_addr := io.ctrl.AR.bits.addr(addr_w - 1, 2)
-        state_rd := sRdRead
+        when(addr_is_mem(io.ctrl.AR.bits.addr(addr_w - 1, 2), area_map).asBool()) {
+          state_rd := sMemCyc
+        }.otherwise {
+          state_rd := sRdRead
+        }
       }
+    }
+    is(sMemCyc) {
+      state_rd := sRdRead
     }
     is(sRdRead) {
       state_rd := sRdResp
@@ -207,6 +213,11 @@ class AxiLiteSubordinateGenerator(
       io.ctrl.R.valid := false.B
       io.ctrl.R.bits.rdata := 0.U
     }
+    is(sMemCyc) {
+      io.ctrl.AR.ready := false.B
+      io.ctrl.R.valid := false.B
+      io.ctrl.R.bits.rdata := 0.U
+    }
     is(sRdRead) {
       io.ctrl.AR.ready := false.B
       io.ctrl.R.valid := false.B
@@ -220,14 +231,18 @@ class AxiLiteSubordinateGenerator(
   }
 
   // read from regs
-  when(rd_en) {
+  when(rd_en && !addr_is_mem(rd_addr, area_map).asBool()) {
     generate_reg_read(area_map, regs, rd_addr, rd_data)
   }
+
+  when(state_rd === sRdIdle) {
+    generate_mem_read(area_map, regs, io.ctrl.AR.bits.addr(addr_w - 1, 2))
+  }
+
+  update_mem_read(area_map, regs, rd_data)
 }
 
 object AxiLiteSubordinateGenerator {
-  def test1(): Unit = {}
-
   // inspired by https://github.com/chipsalliance/chisel3/blob/master/src/test/scala/chiselTests/RecordSpec.scala
   final class Axi4LiteSubordinateGenericBundle(elts: (String, Data)*) extends Record {
     val elements = ListMap(elts map {
@@ -257,9 +272,14 @@ object AxiLiteSubordinateGenerator {
       val singlepulse: Boolean = false
   ) {}
 
-  class Reg(val name: String, val addr: Int, val fields: Field*) {}
+  class Els(val name: String) {}
 
-  class AreaMap(val regs: Reg*) {}
+  class Reg(override val name: String, val addr: Int, val fields: Field*) extends Els(name) {}
+
+  class Mem(override val name: String, val addr: Int, val data_w: Int, val nr_els: Int)
+      extends Els(name) {}
+
+  class AreaMap(val els: Els*) {}
 
   private def field_name(reg: Reg, field: Field): String = {
     reg.name + "_" + field.name
@@ -272,38 +292,57 @@ object AxiLiteSubordinateGenerator {
 
   private def generate_hw_inputs_or_outputs(
       area_map: AreaMap,
-      field_cond: Field => Boolean
+      is_input: Boolean
   ): Axi4LiteSubordinateGenericBundle = {
-    val inputs: ListBuffer[(String, Data)] = ListBuffer[(String, Data)]()
-    for (reg <- area_map.regs) {
+
+    val ports: ListBuffer[(String, Data)] = ListBuffer[(String, Data)]()
+
+    val field_filt: Field => Boolean = if (is_input) { (field: Field) =>
+      field.hw_access == Access.W || field.hw_access == Access.RW
+    } else { (field: Field) =>
+      field.hw_access == Access.R || field.hw_access == Access.RW
+    }
+
+    // regs
+    for (el <- area_map.els if el.isInstanceOf[Reg]) {
+      val reg = el.asInstanceOf[Reg]
       for (field <- reg.fields) {
-        if (field_cond(field)) {
+        if (field_filt(field)) {
           val f_typ = field_type(reg, field)
-          inputs += field_name(reg, field) -> f_typ
+          ports += field_name(reg, field) -> f_typ
         }
       }
     }
-    new Axi4LiteSubordinateGenericBundle(inputs: _*)
+
+    // mems
+    for (el <- area_map.els if el.isInstanceOf[Mem]) {
+      val mem = el.asInstanceOf[Mem]
+      if (is_input) {
+        ports += "MEM_" + mem.name + "_DOUT" -> UInt(mem.data_w.W)
+      } else {
+        ports += "MEM_" + mem.name + "_DIN" -> UInt(mem.data_w.W)
+        ports += "MEM_" + mem.name + "_ADDR" -> UInt(log2Ceil(mem.nr_els).W)
+        ports += "MEM_" + mem.name + "_WE" -> Bool()
+      }
+    }
+
+    new Axi4LiteSubordinateGenericBundle(ports: _*)
   }
 
   private def generate_hw_inputs(area_map: AreaMap): Axi4LiteSubordinateGenericBundle = {
-    generate_hw_inputs_or_outputs(
-      area_map,
-      (field: Field) => field.hw_access == Access.W || field.hw_access == Access.RW
-    )
+    generate_hw_inputs_or_outputs(area_map, is_input = true)
   }
 
   private def generate_hw_outputs(area_map: AreaMap): Axi4LiteSubordinateGenericBundle = {
-    generate_hw_inputs_or_outputs(
-      area_map,
-      (field: Field) => field.hw_access == Access.R || field.hw_access == Access.RW
-    )
+    generate_hw_inputs_or_outputs(area_map, is_input = false)
   }
 
-  type RegType = Map[String, Data]
+  type RegType = mutable.Map[String, Data]
   private def generate_regs(area_map: AreaMap): RegType = {
     val m: RegType = mutable.Map()
-    for (reg <- area_map.regs) {
+
+    for (el <- area_map.els if el.isInstanceOf[Reg]) {
+      val reg = el.asInstanceOf[Reg]
       for (field <- reg.fields) {
         val f_typ = field_type(reg, field)
         val r = if (field.reset.isDefined) {
@@ -311,29 +350,61 @@ object AxiLiteSubordinateGenerator {
         } else {
           Reg(f_typ)
         }
-        m += field_name(reg, field) -> r
+        m += field_name(reg, field) -> r.suggestName(field_name(reg, field))
       }
     }
+
+    for (el <- area_map.els if el.isInstanceOf[Mem]) {
+      val mem = el.asInstanceOf[Mem]
+      m += "MEM_" + mem.name + "_DIN" -> Reg(UInt(mem.data_w.W))
+        .suggestName("MEM_" + mem.name + "_DIN")
+      m += "MEM_" + mem.name + "_DOUT" -> Wire(UInt(mem.data_w.W))
+        .suggestName("MEM_" + mem.name + "_DOUT")
+      m += "MEM_" + mem.name + "_ADDR" -> Reg(UInt(log2Ceil(mem.nr_els).W))
+        .suggestName("MEM_" + mem.name + "_ADDR")
+      m += "MEM_" + mem.name + "_WE" -> RegInit(Bool(), false.B)
+        .suggestName("MEM_" + mem.name + "_WE")
+
+      val reg_act1 = RegInit(Bool(), false.B).suggestName("MEM_" + mem.name + "_ACT1")
+      m += "MEM_" + mem.name + "_ACT1" -> reg_act1
+      m += "MEM_" + mem.name + "_ACT2" -> RegNext(reg_act1)
+        .suggestName("MEM_" + mem.name + "_ACT2")
+    }
+
     m
   }
 
   private def generate_reg_update(area_map: AreaMap, regs: RegType, record: Record): Unit = {
-    for (reg <- area_map.regs) {
+    for (el <- area_map.els if el.isInstanceOf[Reg]) {
+      val reg = el.asInstanceOf[Reg]
       for (field <- reg.fields) {
         if (field.hw_access == Access.RW || field.hw_access == Access.W) {
           regs(field_name(reg, field)) := record.elements(field_name(reg, field))
         }
       }
     }
+
+    for (el <- area_map.els if el.isInstanceOf[Mem]) {
+      val mem = el.asInstanceOf[Mem]
+      regs("MEM_" + mem.name + "_DOUT") := record.elements("MEM_" + mem.name + "_DOUT")
+    }
   }
 
   private def generate_reg_output(area_map: AreaMap, regs: RegType, record: Record): Unit = {
-    for (reg <- area_map.regs) {
+    for (el <- area_map.els if el.isInstanceOf[Reg]) {
+      val reg = el.asInstanceOf[Reg]
       for (field <- reg.fields) {
         if (field.hw_access == Access.RW || field.hw_access == Access.R) {
           record.elements(field_name(reg, field)) := regs(field_name(reg, field))
         }
       }
+    }
+
+    for (el <- area_map.els if el.isInstanceOf[Mem]) {
+      val mem = el.asInstanceOf[Mem]
+      record.elements("MEM_" + mem.name + "_DIN") := regs("MEM_" + mem.name + "_DIN")
+      record.elements("MEM_" + mem.name + "_ADDR") := regs("MEM_" + mem.name + "_ADDR")
+      record.elements("MEM_" + mem.name + "_WE") := regs("MEM_" + mem.name + "_WE")
     }
   }
 
@@ -363,9 +434,27 @@ object AxiLiteSubordinateGenerator {
 
     rd_data := 0xdeadbeefL.U
 
-    for (reg <- area_map.regs) {
+    for (el <- area_map.els if el.isInstanceOf[Reg]) {
+      val reg = el.asInstanceOf[Reg]
       when(rd_addr === (reg.addr / 4).U) {
         rd_data := reg_fields_to_uint(reg, regs)
+      }
+    }
+  }
+
+  private def generate_mem_read(
+      area_map: AreaMap,
+      regs: RegType,
+      rd_addr: UInt
+  ): Unit = {
+    for (el <- area_map.els if el.isInstanceOf[Mem]) {
+      val mem = el.asInstanceOf[Mem]
+      val mem_lo = mem.addr / 4
+      val mem_hi = (mem.addr + mem.nr_els * 4) / 4
+
+      when(rd_addr >= mem_lo.U && rd_addr < mem_hi.U) {
+        regs("MEM_" + mem.name + "_ADDR") := rd_addr - mem_lo.U
+        regs("MEM_" + mem.name + "_ACT1") := true.B
       }
     }
   }
@@ -374,12 +463,19 @@ object AxiLiteSubordinateGenerator {
       area_map: AreaMap,
       regs: RegType
   ): Unit = {
-    for (reg <- area_map.regs) {
+    for (el <- area_map.els if el.isInstanceOf[Reg]) {
+      val reg = el.asInstanceOf[Reg]
       for (field <- reg.fields) {
         if (field.sw_access == Access.RW && field.singlepulse) {
           regs(field_name(reg, field)) := 0.U
         }
       }
+    }
+
+    for (el <- area_map.els if el.isInstanceOf[Mem]) {
+      val mem = el.asInstanceOf[Mem]
+      regs("MEM_" + mem.name + "_ACT1") := false.B
+      regs("MEM_" + mem.name + "_WE") := false.B
     }
   }
 
@@ -389,7 +485,8 @@ object AxiLiteSubordinateGenerator {
       wr_addr: UInt,
       wr_data: UInt
   ): Unit = {
-    for (reg <- area_map.regs) {
+    for (el <- area_map.els if el.isInstanceOf[Reg]) {
+      val reg = el.asInstanceOf[Reg]
       for (field <- reg.fields) {
         if (field.sw_access == Access.W || field.sw_access == Access.RW) {
           val lo = field.lo.getOrElse(field.hi)
@@ -399,5 +496,43 @@ object AxiLiteSubordinateGenerator {
         }
       }
     }
+
+    for (el <- area_map.els if el.isInstanceOf[Mem]) {
+      val mem = el.asInstanceOf[Mem]
+      val mem_lo = mem.addr / 4
+      val mem_hi = (mem.addr + mem.nr_els * 4) / 4
+
+      when(wr_addr >= mem_lo.U && wr_addr < mem_hi.U) {
+        regs("MEM_" + mem.name + "_DIN") := wr_data
+        regs("MEM_" + mem.name + "_ADDR") := wr_addr - mem_lo.U
+        regs("MEM_" + mem.name + "_WE") := true.B
+      }
+    }
+  }
+
+  def update_mem_read(area_map: AreaMap, regs: RegType, rd_data: UInt): Unit = {
+    for (el <- area_map.els if el.isInstanceOf[Mem]) {
+      val mem = el.asInstanceOf[Mem]
+
+      when(regs("MEM_" + mem.name + "_ACT2").asUInt().asBool()) {
+        rd_data := regs("MEM_" + mem.name + "_DOUT")
+      }
+    }
+  }
+
+  def addr_is_mem(addr: UInt, area_map: AreaMap): Bool = {
+    val is_mem = WireInit(false.B)
+
+    for (el <- area_map.els if el.isInstanceOf[Mem]) {
+      val mem = el.asInstanceOf[Mem]
+
+      val mem_lo = mem.addr / 4
+      val mem_hi = (mem.addr + mem.nr_els * 4) / 4
+
+      when(addr >= mem_lo.U && addr < mem_hi.U) {
+        is_mem := true.B
+      }
+    }
+    is_mem
   }
 }
