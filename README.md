@@ -12,6 +12,7 @@ Examples are available in [bfm-tester-examples](https://github.com/j-marjanovic/
 - Add AXI4 memory slave BFM
 - Add Avalon® Memory-Mapped memory slave BFM
 - Add Pulse Detector
+- Add AXI4-Lite slave generator utility
 - Add AxPROT to AXI4-Lite interface
 - Upgrade to Chisel 3.4 and iotesters 1.5
 
