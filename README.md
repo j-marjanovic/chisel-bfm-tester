@@ -16,7 +16,7 @@ Examples are available in [bfm-tester-examples](https://github.com/j-marjanovic/
 - Add AxPROT to AXI4-Lite interface
 - Upgrade to Chisel 3.4 and iotesters 1.5
 
-### 0.3.1 - 2019-01-01
+### 0.3.1 - 2020-01-01
 
 - AXI4-Stream master BFM: add verbosity control
 - AXI4-Stream slave BFM: update handling of the backpressure
