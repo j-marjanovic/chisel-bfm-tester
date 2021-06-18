@@ -29,7 +29,13 @@ import chisel3._
 
 class AxiIf(val addr_w: chisel3.internal.firrtl.Width,
             val data_w: chisel3.internal.firrtl.Width,
-            val id_w: chisel3.internal.firrtl.Width)
+            val id_w: chisel3.internal.firrtl.Width,
+            val awuser_w: chisel3.internal.firrtl.Width = 0.W,
+            val wuser_w: chisel3.internal.firrtl.Width = 0.W,
+            val buser_w: chisel3.internal.firrtl.Width = 0.W,
+            val aruser_w: chisel3.internal.firrtl.Width = 0.W,
+            val ruser_w: chisel3.internal.firrtl.Width = 0.W,
+           )
     extends Bundle {
   val AW = Irrevocable(new Bundle {
     val id: UInt = UInt(id_w)
@@ -41,20 +47,19 @@ class AxiIf(val addr_w: chisel3.internal.firrtl.Width,
     val cache: UInt = UInt(4.W)
     val prot: UInt = UInt(3.W)
     val qos: UInt = UInt(4.W)
-    // val user: UInt = UInt(awuser_w)
+    val user: UInt = UInt(awuser_w)
     // region signal is optional
   })
   val W = Irrevocable(new Bundle {
-    val id: UInt = UInt(id_w)
     val data: UInt = UInt(data_w)
     val strb: UInt = UInt((data_w.get / 8).W)
     val last: Bool = Bool()
-    // val user: UInt = UInt(wuser_w)
+    val user: UInt = UInt(wuser_w)
   })
   val B = Flipped(Irrevocable(new Bundle {
     val id: UInt = UInt(id_w)
     val resp: UInt = UInt(3.W)
-    // val user: UInt = UInt(buser_w)
+    val user: UInt = UInt(buser_w)
   }))
   val AR = Irrevocable(new Bundle {
     val id: UInt = UInt(id_w)
@@ -66,7 +71,7 @@ class AxiIf(val addr_w: chisel3.internal.firrtl.Width,
     val cache: UInt = UInt(4.W)
     val prot: UInt = UInt(3.W)
     val qos: UInt = UInt(4.W)
-    // val user: UInt = UInt(aruser_w)
+    val user: UInt = UInt(aruser_w)
     // region signal is optional
   })
   val R = Flipped(Irrevocable(new Bundle {
@@ -74,6 +79,6 @@ class AxiIf(val addr_w: chisel3.internal.firrtl.Width,
     val data: UInt = UInt(data_w)
     val resp: UInt = UInt(3.W)
     val last: Bool = Bool()
-    // val user: UInt = UInt(ruser_w)
+    val user: UInt = UInt(ruser_w)
   }))
 }
