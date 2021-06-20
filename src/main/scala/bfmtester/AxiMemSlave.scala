@@ -174,7 +174,7 @@ class AxiMemSlave(
 
         // if there was data received before we had an address, the data was stored in tmp queue
         // before we pass the address to the write_data process, handle all the pending data transactions
-        val data_count = Math.min(tmp_data_queue.length, len.toInt)
+        val data_count = Math.min(tmp_data_queue.length, len.toInt + 1)
         for (data <- tmp_data_queue.take(data_count)) {
           mem_set_word(addr, data, width_bits / 8)
           printWithBg(
@@ -185,7 +185,8 @@ class AxiMemSlave(
         }
         tmp_data_queue.remove(0, data_count)
 
-        if (len != 0) {
+        // len is -1 when the transaction was completed from the data queue -> gen response
+        if (len >= 0) {
           write_addrs += new Addr(addr, len, id)
         } else {
           gen_resp = true
@@ -237,6 +238,9 @@ class AxiMemSlave(
     }
     def update_write_resp(t: Long, poke: (Bits, BigInt) => Unit): Unit = {
       if (gen_resp) {
+        printWithBg(
+          f"${t}%5d AxiMemSlave($ident): Write Response"
+        )
         poke(axi.B.valid, 1)
         poke(axi.B.bits.resp, AxiIfRespToInt(AxiIfResp.OKAY))
       } else {
