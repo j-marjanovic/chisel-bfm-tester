@@ -28,6 +28,7 @@ import chisel3.experimental.DataMirror
 import chisel3.internal.requireIsChiselType
 import chisel3.util._
 
+import java.io.{BufferedWriter, File, FileWriter}
 import scala.collection.immutable.ListMap
 import scala.collection.mutable
 import scala.collection.mutable.{ListBuffer, Map}
@@ -280,6 +281,38 @@ object AxiLiteSubordinateGenerator {
       extends Els(name) {}
 
   class AreaMap(val els: Els*) {}
+
+  /** Create a Python header from an AreaMap */
+  def gen_python_header(area_map: AreaMap, class_filename: String, out_filename: String): Unit = {
+    val regs_sorted = area_map.els
+      .filter(_.isInstanceOf[Reg])
+      .sortBy(_.asInstanceOf[Reg].addr)
+
+    val reg_addr_last = regs_sorted.last.asInstanceOf[AxiLiteSubordinateGenerator.Reg].addr
+
+    var reg_dict: Map[Int, Reg] = Map[Int, Reg]()
+    for (el <- area_map.els.filter(_.isInstanceOf[Reg])) {
+      val reg = el.asInstanceOf[Reg]
+      reg_dict += (reg.addr -> reg)
+    }
+
+    val file = new File(out_filename)
+    val bw = new BufferedWriter(new FileWriter(file))
+
+    bw.write("# auto-generated with AxiLiteSubordinateGenerator from chisel-bfm-tester\n\n")
+    bw.write("import ctypes\n\n\n")
+    bw.write(s"class ${class_filename}(ctypes.Structure):\n")
+    bw.write("    _pack_ = 1\n")
+    bw.write("    _fields_ = [\n")
+
+    for (i <- 0 to reg_addr_last by 4) {
+      val s: String = reg_dict.get(i).map(_.name).getOrElse(f"rsvd0x${i}%x")
+      bw.write(s"""        ("${s}", ctypes.c_uint32),\n""")
+    }
+
+    bw.write("    ]\n")
+    bw.close()
+  }
 
   private def field_name(reg: Reg, field: Field): String = {
     reg.name + "_" + field.name
