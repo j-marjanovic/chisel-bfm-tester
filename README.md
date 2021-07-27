@@ -7,7 +7,7 @@ Examples are available in [bfm-tester-examples](https://github.com/j-marjanovic/
 
 ## Changelog
 
-### [unreleased]
+### 0.4.0 - 2021-07-21
 
 - Add AXI4 memory slave BFM
 - Add Avalon® Memory-Mapped memory slave BFM
