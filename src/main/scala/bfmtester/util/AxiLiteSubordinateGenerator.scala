@@ -32,6 +32,7 @@ import java.io.{BufferedWriter, File, FileWriter}
 import scala.collection.immutable.ListMap
 import scala.collection.mutable
 import scala.collection.mutable.{ListBuffer, Map}
+import scala.util.control.Breaks.{break, breakable}
 
 class AxiLiteSubordinateGenerator(
     area_map: AxiLiteSubordinateGenerator.AreaMap,
@@ -311,6 +312,83 @@ object AxiLiteSubordinateGenerator {
     }
 
     bw.write("    ]\n")
+    bw.close()
+  }
+
+  def gen_c_header(
+      area_map: AreaMap,
+      class_filename: String,
+      out_filename: String,
+      use_cpp_header: Boolean = false
+  ): Unit = {
+    val regs_sorted = area_map.els
+      .filter(_.isInstanceOf[Reg])
+      .sortBy(_.asInstanceOf[Reg].addr)
+
+    val reg_addr_last = regs_sorted.last.asInstanceOf[AxiLiteSubordinateGenerator.Reg].addr
+
+    var reg_dict: mutable.Map[Int, Reg] = mutable.Map[Int, Reg]()
+    for (el <- area_map.els.filter(_.isInstanceOf[Reg])) {
+      val reg = el.asInstanceOf[Reg]
+      reg_dict += (reg.addr -> reg)
+    }
+
+    val file = new File(out_filename)
+    val bw = new BufferedWriter(new FileWriter(file))
+
+    bw.write("// auto-generated with AxiLiteSubordinateGenerator from chisel-bfm-tester\n\n")
+
+    if (use_cpp_header) {
+      bw.write("#include <cstdint>\n\n")
+    } else {
+      bw.write("#include <stdint.h>\n\n")
+    }
+    bw.write(s"struct __attribute__((__packed__)) ${class_filename}_regs {\n")
+
+    for (addr <- 0 to reg_addr_last by 4) {
+      val reg = reg_dict.get(addr)
+
+      var s: String = ""
+      if (reg.isEmpty) {
+        s = f"  uint32_t rsvd0x${addr}%x;"
+      } else {
+        if (reg.get.fields.length == 1 && reg.get.fields.head.name == "") {
+          s = s"  uint32_t ${reg.get.name};  // single reg"
+        } else {
+          s = s"  struct __attribute__((__packed__)) {\n"
+
+          val field_dict: mutable.Map[Int, (String, Int)] = mutable.Map[Int, (String, Int)]()
+          for (field <- reg.get.fields) {
+            if (field.sw_access != AxiLiteSubordinateGenerator.Access.NA) {
+              field_dict += (field.lo
+                .getOrElse(field.hi) -> (field.name, field.hi - field.lo.getOrElse(field.hi) + 1))
+            }
+          }
+
+          breakable {
+            var i = 0
+            while (true) {
+              if (field_dict.contains(i)) {
+                val field = field_dict(i)
+                s += s"    uint32_t ${field._1} : ${field._2};\n"
+                i += field._2
+              } else {
+                s += s"    uint32_t rsvd${i} : 1;\n"
+                i += 1
+              }
+              if (i >= 32) {
+                break
+              }
+            }
+          }
+          val name = reg.get.name
+          s += s"  } ${name};"
+        }
+      }
+      bw.write(s"${s}\n\n")
+    }
+
+    bw.write("};\n")
     bw.close()
   }
 

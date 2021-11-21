@@ -1,7 +1,6 @@
-
-ThisBuild / scalaVersion     := "2.12.13"
-ThisBuild / version          := "0.4.0"
-ThisBuild / organization     := "io.j-marjanovic"
+ThisBuild / scalaVersion := "2.12.13"
+ThisBuild / version := "0.4.1"
+ThisBuild / organization := "io.j-marjanovic"
 
 lazy val root = (project in file("."))
   .settings(
@@ -17,7 +16,7 @@ def scalacOptionsVersion(scalaVersion: String): Seq[String] = {
     //  https://github.com/scala/bug/issues/10047
     CrossVersion.partialVersion(scalaVersion) match {
       case Some((2, scalaMajor: Long)) if scalaMajor < 12 => Seq()
-      case _ => Seq("-Xsource:2.11")
+      case _                                              => Seq("-Xsource:2.11")
     }
   }
 }
