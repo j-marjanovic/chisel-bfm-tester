@@ -50,4 +50,12 @@ class AxiLiteSubordinateGenTester(c: AxiLiteSubordinateExample) extends BfmTeste
   write_blocking(0xc, 0xaa00bb, 0x5)
   expect(read_blocking(0xc) == 0x11aa33bb, "two writes, different strobes")
 
+  step(20)
+
+  write_blocking(0xc, 0, 0xf)
+  step(5)
+  write_blocking(0xd, 0xaabbcc11, 0x1)
+  step(5)
+  expect(read_blocking(0xc) == 0x1100, "unaligned write")
+
 }
