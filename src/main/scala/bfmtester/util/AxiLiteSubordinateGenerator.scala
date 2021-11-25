@@ -78,8 +78,8 @@ class AxiLiteSubordinateGenerator(
       when(io.ctrl.AW.valid && io.ctrl.W.valid) {
         wr_en := true.B
         wr_addr := io.ctrl.AW.bits.addr(addr_w - 1, 2)
-        wr_data := io.ctrl.W.bits.wdata << (io.ctrl.AW.bits.addr(1, 0) * 8.U)
-        wr_strb := io.ctrl.W.bits.wstrb << io.ctrl.AW.bits.addr(1, 0)
+        wr_data := io.ctrl.W.bits.wdata
+        wr_strb := io.ctrl.W.bits.wstrb
 
         state_wr := sWrResp
       }.elsewhen(io.ctrl.AW.valid) {
@@ -95,8 +95,8 @@ class AxiLiteSubordinateGenerator(
     is(sWrHasRecvAddr) {
       when(io.ctrl.W.valid) {
         wr_en := true.B
-        wr_data := io.ctrl.W.bits.wdata << (wr_addr(1, 0) * 8.U)
-        wr_strb := io.ctrl.W.bits.wstrb << wr_addr(1, 0)
+        wr_data := io.ctrl.W.bits.wdata
+        wr_strb := io.ctrl.W.bits.wstrb
         state_wr := sWrResp
       }
     }
