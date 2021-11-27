@@ -7,6 +7,10 @@ Examples are available in [bfm-tester-examples](https://github.com/j-marjanovic/
 
 ## Changelog
 
+### 0.4.2 - 2021-11-27
+
+- AXI4-Lite subordinate generator correctly handles `WSTRB` signal
+
 ### 0.4.1 - 2021-11-21
 
 - AXI4-Lite subordinate generator can also generate C and C++ headers

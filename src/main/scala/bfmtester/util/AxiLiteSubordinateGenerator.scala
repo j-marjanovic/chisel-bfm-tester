@@ -80,6 +80,7 @@ class AxiLiteSubordinateGenerator(
         wr_addr := io.ctrl.AW.bits.addr(addr_w - 1, 2)
         wr_data := io.ctrl.W.bits.wdata
         wr_strb := io.ctrl.W.bits.wstrb
+
         state_wr := sWrResp
       }.elsewhen(io.ctrl.AW.valid) {
           wr_addr := io.ctrl.AW.bits.addr(addr_w - 1, 2)
@@ -147,24 +148,9 @@ class AxiLiteSubordinateGenerator(
   io.ctrl.R.bits.rresp := 0x0.U(2.W)
 
   // write to regs
-  def wrWithStrobe(data: UInt, prev: UInt, strobe: UInt): UInt = {
-    val BIT_W = 8
-    val tmp = Wire(Vec(prev.getWidth / BIT_W, UInt(BIT_W.W)))
-
-    for (i <- 0 until prev.getWidth / BIT_W) {
-      when((strobe & (1 << i).U) =/= 0.U) {
-        tmp(i) := data((i + 1) * BIT_W - 1, i * BIT_W)
-      }.otherwise {
-        tmp(i) := prev((i + 1) * BIT_W - 1, i * BIT_W)
-      }
-    }
-
-    tmp.asUInt()
-  }
-
   generate_reg_wr_pulse(area_map, regs)
   when(wr_en) {
-    generate_reg_write(area_map, regs, wr_addr, wr_data)
+    generate_reg_write(area_map, regs, wr_addr, wr_data, wr_strb)
   }
 
   //==========================================================================
@@ -594,7 +580,8 @@ object AxiLiteSubordinateGenerator {
       area_map: AreaMap,
       regs: RegType,
       wr_addr: UInt,
-      wr_data: UInt
+      wr_data: UInt,
+      wr_strb: UInt
   ): Unit = {
     for (el <- area_map.els if el.isInstanceOf[Reg]) {
       val reg = el.asInstanceOf[Reg]
@@ -602,7 +589,19 @@ object AxiLiteSubordinateGenerator {
         if (field.sw_access == Access.W || field.sw_access == Access.RW) {
           val lo = field.lo.getOrElse(field.hi)
           when(wr_addr === (reg.addr / 4).U) {
-            regs(field_name(reg, field)) := wr_data(field.hi, lo)
+            val prev: UInt = Cat(0.U(32.W), reg_fields_to_uint(reg, regs))
+            val tmp = Wire(Vec(32 / 8, UInt(8.W)))
+            tmp := DontCare
+
+            for (i <- 0 until 4) {
+              when((wr_strb & (1 << i).U) =/= 0.U) {
+                tmp(i) := wr_data((i + 1) * 8 - 1, i * 8)
+              }.otherwise {
+                tmp(i) := prev((i + 1) * 8 - 1, i * 8)
+              }
+            }
+
+            regs(field_name(reg, field)) := (tmp.asUInt() >> lo)(field.hi - lo, 0)
           }
         }
       }
